@@ -56,9 +56,9 @@ def update_gas_prices(region_code):
     ngp_dates = [datetime.datetime.strptime(d,'%Y-%b %d') for d in d_str]
 
     v_str = [v.text.strip() for v in values]
-    ngp_price = [float(v) if v is not u'' else 0. for v in v_str]
+    ngp_prices = [float(v) if v is not u'' else 0. for v in v_str]
 
-    return ngp_dates,ngp_price
+    return ngp_dates,ngp_prices
 
 def combine_gas_region_prices():
 
@@ -66,9 +66,9 @@ def combine_gas_region_prices():
     all_dates,all_prices = [],[]
     for r in regions:
         print("Loading gas price data for {} region".format(r['region_name']))
-        ngp_dates,ngp_price = update_gas_prices(r['region_code'])
+        ngp_dates,ngp_prices = update_gas_prices(r['region_code'])
         truthArray = [True if x > r['startDate'] and x <= r['endDate'] else False for x in ngp_dates]
-        for t,d,p in zip(truthArray,ngp_dates,ngp_price):
+        for t,d,p in zip(truthArray,ngp_dates,ngp_prices):
             if t:
                 all_dates.append(d)
                 all_prices.append(p)
@@ -90,31 +90,16 @@ def load_gas_prices():
         ngp = f.readlines()
     ngp = [n.strip().split(',') for n in ngp]
     ngp_dates = [datetime.datetime.strptime(n[0],'%m/%d/%Y') for n in ngp]
-    ngp_price = [float(n[1]) for n in ngp]
+    ngp_prices = [float(n[1]) for n in ngp]
 
     # Reverse them so that they're sorted from oldest to newest (same format as web-based data)
 
     ngp_dates_rev = ngp_dates[::-1]
-    ngp_price_rev = ngp_price[::-1]
+    ngp_prices_rev = ngp_prices[::-1]
 
-    return ngp_dates_rev,ngp_price_rev
+    return ngp_dates_rev,ngp_prices_rev
 
-def main(argv):
-
-    try:
-       opts, args = getopt.getopt(argv,"u")
-    except getopt.GetoptError:
-       print('python gasmileage.py [-u]')
-       sys.exit(2)
-    if len(opts) > 0:
-        for opt, arg in opts:
-           if opt == '-u':
-               #ngp_dates,ngp_price = update_gas_prices()
-               #print("\nDownloading updated gas price data from http://www.eia.gov\n")
-               ngp_dates,ngp_price = combine_gas_region_prices()
-    else:
-        ngp_dates,ngp_price = load_gas_prices()
-        print("\nUsing archived gas price data from %s \n" % datetime.datetime.strftime(ngp_dates[-1],'%Y-%m-%d'))
+def plot_gas_mileage(dates,prices):
 
     # Import personal data on gas prices, mileage, and distance
 
@@ -129,7 +114,7 @@ def main(argv):
     # Limit gas price data to after when I purchased the car
 
     istart = 0
-    for idx,n in enumerate(ngp_dates):
+    for idx,n in enumerate(dates):
         if n == datetime.datetime(2014, 3, 10, 0, 0):
             istart = idx
 
@@ -170,7 +155,7 @@ def main(argv):
     ax2 = fig.add_subplot(212)
     mask2 = np.isfinite(price)
     ln_my_price = ax2.plot(my_dates[mask2],price[mask2],color='C1',linewidth=2,label='Price I paid')
-    ln_avg_price = ax2.plot(ngp_dates[istart:],ngp_price[istart:],color='C2',label='Average price in region')
+    ln_avg_price = ax2.plot(dates[istart:],prices[istart:],color='C2',label='Average price in region')
     ax2.set_xlabel('Date')
     ax2.set_ylabel('Gas price [$/gal]')
     ax2.set_title('Prices for gasoline',fontsize=22)
@@ -186,9 +171,8 @@ def main(argv):
     amountExpectedPaid = 0
     for d,g,p in zip(my_dates[mask2],gallons[mask2],price[mask2]):
         d_datetime = datetime.datetime.combine(d,datetime.datetime.min.time())
-        i = np.argmin(abs(d_datetime - np.array(ngp_dates)))
-        amountExpectedPaid += (ngp_price[i] * g)
-        #print("{:.2f} avg, {:.2f} paid; diff = {:7.2f}".format(ngp_price[i] * g,p*g,(ngp_price[i]-p)*g))
+        i = np.argmin(abs(d_datetime - np.array(dates)))
+        amountExpectedPaid += (prices[i] * g)
 
     print("Total amount I actually paid             : {:.2f}".format(amountActuallyPaid))
     print("Total amount I would have expected to pay: {:.2f}".format(amountExpectedPaid))
@@ -201,6 +185,31 @@ def main(argv):
     # Fix final figure parameters
     fig.set_tight_layout(True)
     plt.show()
+
+    return None
+
+def main(argv):
+
+    try:
+       opts, args = getopt.getopt(argv,"u")
+    except getopt.GetoptError:
+       print('python gasmileage.py [-u]')
+       sys.exit(2)
+    if len(opts) > 0:
+        for opt, arg in opts:
+           if opt == '-u':
+               #ngp_dates,ngp_prices = update_gas_prices()
+               #print("\nDownloading updated gas price data from http://www.eia.gov\n")
+               ngp_dates,ngp_prices = combine_gas_region_prices()
+    else:
+        ngp_dates,ngp_prices = load_gas_prices()
+        print("\nUsing archived gas price data from %s \n" % datetime.datetime.strftime(ngp_dates[-1],'%Y-%m-%d'))
+
+    # Create plot
+
+    plot_gas_mileage(ngp_dates,ngp_prices)
+
+    return None
 
 if __name__ == "__main__":
    main(sys.argv[1:])
