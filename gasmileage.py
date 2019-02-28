@@ -1,8 +1,12 @@
 import datetime
-import sys,getopt
+import sys
+import getopt
+import urllib2
+import itertools
 
 import numpy as np
 from matplotlib import pyplot as plt
+from bs4 import BeautifulSoup
 
 inputDataPath = './data'
 
@@ -12,7 +16,7 @@ inputDataPath = './data'
 
 '''
 
-def getRegions():
+def get_regions():
 
     r = [{'startDate':datetime.datetime(2011,7,1),
             'endDate':datetime.datetime(2016,12,1),
@@ -26,10 +30,6 @@ def getRegions():
     return r
 
 def update_gas_prices(region_code):
-
-    import urllib2
-    import itertools
-    from bs4 import BeautifulSoup
 
     url = "http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EMM_EPM0U_PTE_R{}_DPG&f=W".format(region_code)
     page = urllib2.urlopen(url).read()
@@ -62,10 +62,10 @@ def update_gas_prices(region_code):
 
 def combine_gas_region_prices():
 
-    regions = getRegions()
+    regions = get_regions()
     all_dates,all_prices = [],[]
     for r in regions:
-        print "Loading gas price data for {} region".format(r['region_name'])
+        print("Loading gas price data for {} region".format(r['region_name']))
         ngp_dates,ngp_price = update_gas_prices(r['region_code'])
         truthArray = [True if x > r['startDate'] and x <= r['endDate'] else False for x in ngp_dates]
         for t,d,p in zip(truthArray,ngp_dates,ngp_price):
@@ -76,18 +76,21 @@ def combine_gas_region_prices():
     return all_dates,all_prices
 
 def load_gas_prices():
+    """
+    Source of data:
+    http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EMM_EPMRU_PTE_R20_DPG&f=W
 
-    from astropy.io import ascii
-
-    # Source of data:
-    #
-    # http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EMM_EPMRU_PTE_R20_DPG&f=W
-    # Select hamburger menu on right of screen above graph to download CSV data
+    Select hamburger menu on right of screen above graph to download CSV data on
+    the webpage.
+    """
 
     national_gas_price_file = '%s/Weekly_Midwest_Regular_Conventional_Retail_Gasoline_Prices.csv' % inputDataPath
-    ngp = ascii.read(national_gas_price_file,data_start = 5)
-    ngp_dates = [datetime.datetime.strptime(d,'%m/%d/%Y') for d in ngp['col1']]
-    ngp_price = ngp['col2']
+    with open(national_gas_price_file,'r') as f:
+        skipped = [f.readline() for _ in range(5)]
+        ngp = f.readlines()
+    ngp = [n.strip().split(',') for n in ngp]
+    ngp_dates = [datetime.datetime.strptime(n[0],'%m/%d/%Y') for n in ngp]
+    ngp_price = [float(n[1]) for n in ngp]
 
     # Reverse them so that they're sorted from oldest to newest (same format as web-based data)
 
@@ -101,17 +104,17 @@ def main(argv):
     try:
        opts, args = getopt.getopt(argv,"u")
     except getopt.GetoptError:
-       print 'python gasmileage.py [-u]'
+       print('python gasmileage.py [-u]')
        sys.exit(2)
     if len(opts) > 0:
         for opt, arg in opts:
            if opt == '-u':
                #ngp_dates,ngp_price = update_gas_prices()
-               #print "\nDownloading updated gas price data from http://www.eia.gov\n"
+               #print("\nDownloading updated gas price data from http://www.eia.gov\n")
                ngp_dates,ngp_price = combine_gas_region_prices()
     else:
         ngp_dates,ngp_price = load_gas_prices()
-        print "\nUsing archived gas price data from %s \n" % datetime.datetime.strftime(ngp_dates[-1],'%Y-%m-%d')
+        print("\nUsing archived gas price data from %s \n" % datetime.datetime.strftime(ngp_dates[-1],'%Y-%m-%d'))
 
     # Import personal data on gas prices, mileage, and distance
 
@@ -122,7 +125,7 @@ def main(argv):
     gallons = d['gallons']
     mileage = d['mileage']
     price = d['price'] + 0.009
-   
+
     # Limit gas price data to after when I purchased the car
 
     istart = 0
@@ -142,8 +145,10 @@ def main(argv):
     mpg = np.array([m/g for m,g in zip(mileage,gallons)])
     ax1.plot(my_dates[mask1],mpg[mask1],color='C0',linewidth=2)
 
-    # Info for 2014 Subaru Wagon with manual transmission is from
-    # http://www.fueleconomy.gov/feg/Find.do?action=sbs&id=34225
+    """
+    Info for 2014 Subaru Wagon with manual transmission is from
+    http://www.fueleconomy.gov/feg/Find.do?action=sbs&id=34225
+    """
 
     mpg_city,mpg_hwy,mpg_comb = 25,33,28
 
@@ -174,25 +179,24 @@ def main(argv):
     labs = [l.get_label() for l in lns]
     ax2.legend(lns, labs, loc='best',fontsize='medium')
 
-
     # How much money have I lost/saved compared to the regional average?
 
-    amount_i_paid = (gallons[mask2] * price[mask2]).sum()
+    amountActuallyPaid = (gallons[mask2] * price[mask2]).sum()
 
-    amount_expected = 0
+    amountExpectedPaid = 0
     for d,g,p in zip(my_dates[mask2],gallons[mask2],price[mask2]):
         d_datetime = datetime.datetime.combine(d,datetime.datetime.min.time())
         i = np.argmin(abs(d_datetime - np.array(ngp_dates)))
-        amount_expected += (ngp_price[i] * g)
+        amountExpectedPaid += (ngp_price[i] * g)
         #print("{:.2f} avg, {:.2f} paid; diff = {:7.2f}".format(ngp_price[i] * g,p*g,(ngp_price[i]-p)*g))
 
-    print("Total amount I actually paid             : {:.2f}".format(amount_i_paid))
-    print("Total amount I would have expected to pay: {:.2f}".format(amount_expected))
-    amount_saved = "${:.2f}".format(amount_expected - amount_i_paid)
-    print("Average per fill-up: ${:.2f} ({} trips)".format((amount_expected - amount_i_paid)/mask2.sum(),mask2.sum()))
-    cg = 'g' if amount_saved > 0 else 'r'
+    print("Total amount I actually paid             : {:.2f}".format(amountActuallyPaid))
+    print("Total amount I would have expected to pay: {:.2f}".format(amountExpectedPaid))
+    amountSaved = "${:.2f}".format(amountExpectedPaid - amountActuallyPaid)
+    print("Average per fill-up: ${:.2f} ({} trips)".format((amountExpectedPaid - amountActuallyPaid)/mask2.sum(),mask2.sum()))
+    cg = 'g' if amountSaved > 0 else 'r'
     ax2.text(my_dates[mask2][int(mask2.sum()*0.8)],2.0,"Money saved: ", color='k' ,va = 'baseline',ha='right',size='large')
-    ax2.text(my_dates[mask2][int(mask2.sum()*0.8)],2.0,amount_saved, color=cg ,va = 'baseline',ha='left',size='large')
+    ax2.text(my_dates[mask2][int(mask2.sum()*0.8)],2.0,amountSaved, color=cg ,va = 'baseline',ha='left',size='large')
 
     # Fix final figure parameters
     fig.set_tight_layout(True)
