@@ -86,7 +86,7 @@ def load_gas_prices():
 
     national_gas_price_file = '%s/Weekly_Midwest_Regular_Conventional_Retail_Gasoline_Prices.csv' % inputDataPath
     with open(national_gas_price_file,'r') as f:
-        skipped = [f.readline() for _ in range(5)]
+        [f.readline() for _ in range(5)]
         ngp = f.readlines()
     ngp = [n.strip().split(',') for n in ngp]
     ngp_dates = [datetime.datetime.strptime(n[0],'%m/%d/%Y') for n in ngp]
