@@ -3,18 +3,16 @@ import sys
 import getopt
 import urllib2
 import itertools
+import csv
 
 import numpy as np
 from matplotlib import pyplot as plt
 from bs4 import BeautifulSoup
 
 inputDataPath = './data'
+cachedGasPriceFile = '{}/cached_gas_prices.csv'.format(inputDataPath)
 
-'''Todo:
-
-    save the updated gas prices in identical format
-
-'''
+ymdFormat = '%Y-%m-%d'
 
 def get_regions():
 
@@ -30,6 +28,12 @@ def get_regions():
     return r
 
 def update_gas_prices(region_code):
+    """
+    Raw source of data is EIA website
+
+    Select hamburger menu on right of screen above graph to download CSV data on
+    the webpage.
+    """
 
     url = "http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EMM_EPM0U_PTE_R{}_DPG&f=W".format(region_code)
     page = urllib2.urlopen(url).read()
@@ -52,7 +56,7 @@ def update_gas_prices(region_code):
             values.remove(v)
 
     # Format date and price data into numpy arrays
-    d_str = ['%s %s' % (m,d.text.strip()[-2:]) for m,d in zip(months_expanded,days)]
+    d_str = ['{} {}'.format(m,d.text.strip()[-2:]) for m,d in zip(months_expanded,days)]
     ngp_dates = [datetime.datetime.strptime(d,'%Y-%b %d') for d in d_str]
 
     v_str = [v.text.strip() for v in values]
@@ -60,12 +64,13 @@ def update_gas_prices(region_code):
 
     return ngp_dates,ngp_prices
 
-def combine_gas_region_prices():
+def combine_gas_region_prices(verbose=True):
 
     regions = get_regions()
     all_dates,all_prices = [],[]
     for r in regions:
-        print("Loading gas price data for {} region".format(r['region_name']))
+        if verbose:
+            print("Loading gas price data for {} region".format(r['region_name']))
         ngp_dates,ngp_prices = update_gas_prices(r['region_code'])
         truthArray = [True if x > r['startDate'] and x <= r['endDate'] else False for x in ngp_dates]
         for t,d,p in zip(truthArray,ngp_dates,ngp_prices):
@@ -75,35 +80,24 @@ def combine_gas_region_prices():
 
     return all_dates,all_prices
 
-def load_gas_prices():
+def load_gas_prices(filename=cachedGasPriceFile):
     """
-    Source of data:
-    http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EMM_EPMRU_PTE_R20_DPG&f=W
-
-    Select hamburger menu on right of screen above graph to download CSV data on
-    the webpage.
+    Load data from local file as of the last update call.
     """
 
-    national_gas_price_file = '%s/Weekly_Midwest_Regular_Conventional_Retail_Gasoline_Prices.csv' % inputDataPath
-    with open(national_gas_price_file,'r') as f:
-        [f.readline() for _ in range(5)]
+    with open(filename,'r') as f:
         ngp = f.readlines()
     ngp = [n.strip().split(',') for n in ngp]
-    ngp_dates = [datetime.datetime.strptime(n[0],'%m/%d/%Y') for n in ngp]
+    ngp_dates = [datetime.datetime.strptime(n[0],ymdFormat) for n in ngp]
     ngp_prices = [float(n[1]) for n in ngp]
 
-    # Reverse them so that they're sorted from oldest to newest (same format as web-based data)
-
-    ngp_dates_rev = ngp_dates[::-1]
-    ngp_prices_rev = ngp_prices[::-1]
-
-    return ngp_dates_rev,ngp_prices_rev
+    return ngp_dates,ngp_prices
 
 def plot_gas_mileage(dates,prices):
 
     # Import personal data on gas prices, mileage, and distance
 
-    d = np.genfromtxt('%s/gas_subaru.txt' % inputDataPath,delimiter=',',names=('month','day','year','gallons','mileage','price'))
+    d = np.genfromtxt('{}/gas_subaru.txt'.format(inputDataPath),delimiter=',',names=('month','day','year','gallons','mileage','price'))
 
     my_dates = np.array([datetime.date(2000+int(Y),int(M),int(D)) for Y,M,D in zip(d['year'],d['month'],d['day'])])
 
@@ -197,13 +191,24 @@ def main(argv):
        sys.exit(2)
     if len(opts) > 0:
         for opt, arg in opts:
-           if opt == '-u':
-               #ngp_dates,ngp_prices = update_gas_prices()
-               #print("\nDownloading updated gas price data from http://www.eia.gov\n")
-               ngp_dates,ngp_prices = combine_gas_region_prices()
+            if opt == '-u':
+                # Scrape the EIA website and get updated national avg gas prices
+                try:
+                    ngp_dates,ngp_prices = combine_gas_region_prices()
+
+                    # Save results to new file
+
+                    with open(cachedGasPriceFile,'w') as wf:
+                        writer = csv.writer(wf,delimiter=',')
+                        ngp_dates_str = [datetime.datetime.strftime(d,ymdFormat) for d in ngp_dates]
+                        for d,p in zip(ngp_dates_str,ngp_prices):
+                            writer.writerow([d,p])
+                except:
+                    print("Exception when trying to download new gas prices.")
     else:
+        # Use local copy of whatever data was scraped most recently
         ngp_dates,ngp_prices = load_gas_prices()
-        print("\nUsing archived gas price data from %s \n" % datetime.datetime.strftime(ngp_dates[-1],'%Y-%m-%d'))
+        print("\nUsing local file with gas price data; current through {}. \n".format(datetime.datetime.strftime(ngp_dates[-1],ymdFormat)))
 
     # Create plot
 
