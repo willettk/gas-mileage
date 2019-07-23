@@ -131,13 +131,19 @@ def plot_gas_mileage(dates,prices):
 
     mpg_city,mpg_hwy,mpg_comb = 25,33,28
 
-    ax1.text(my_dates[mask1][0],mpg_city,'  city',    color='black',va = 'baseline',ha='left',size='small')
-    ax1.text(my_dates[mask1][0],mpg_hwy, '  highway', color='black',va = 'baseline',ha='left',size='small')
-    ax1.text(my_dates[mask1][0],mpg_comb,'  combined',color='black',va = 'baseline',ha='left',size='small')
+    ax1.text(my_dates[mask1][0],mpg_city,'  city',    color='grey',va = 'baseline',ha='left',size='small')
+    ax1.text(my_dates[mask1][0],mpg_hwy, '  highway', color='grey',va = 'baseline',ha='left',size='small')
+    ax1.text(my_dates[mask1][0],mpg_comb,'  combined',color='grey',va = 'baseline',ha='left',size='small')
 
-    ax1.axhline(mpg_city,color='black',linestyle='-',lw=1)
-    ax1.axhline(mpg_comb,color='black',linestyle='--',lw=1)
-    ax1.axhline(mpg_hwy,color='black',linestyle='-',lw=1)
+    # Actual miles per gallon
+    
+    mpg_actual = sum(mileage[mask1]) / sum(gallons[mask1])
+    ax1.text(my_dates[mask1][0],mpg_actual,'  actual',color='black',va = 'baseline',ha='left',size='small')
+
+    ax1.axhline(mpg_city,color='grey',linestyle='-',lw=1)
+    ax1.axhline(mpg_comb,color='grey',linestyle='--',lw=1)
+    ax1.axhline(mpg_hwy,color='grey',linestyle='-',lw=1)
+    ax1.axhline(mpg_actual,color='black',linestyle='-.',lw=1)
 
     ax1.set_xlabel('Date')
     ax1.set_ylabel('Miles per gallon')
