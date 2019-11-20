@@ -154,7 +154,7 @@ def plot_gas_mileage(dates, prices):
     ax1.set_xlabel('Date')
     ax1.set_ylabel('Miles per gallon')
     ax1.set_title('Mileage for Subaru Impreza', fontsize=22)
-    ax1.set_ylim(20, 35)
+    ax1.set_ylim(20, 38)
 
     # Plot price paid for gasoline
 
