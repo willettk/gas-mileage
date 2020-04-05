@@ -1,9 +1,10 @@
 import datetime
 import sys
 import getopt
-import urllib2
+import urllib
 import itertools
 import csv
+import re
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -37,9 +38,9 @@ def update_gas_prices(region_code):
     on the webpage.
     """
 
-    url = f"http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx" + \
-        "?n=PET&s=EMM_EPM0U_PTE_R{region_code}_DPG&f=W"
-    page = urllib2.urlopen(url).read()
+    url = "http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx" + \
+        f"?n=PET&s=EMM_EPM0U_PTE_R{region_code}_DPG&f=W"
+    page = urllib.request.urlopen(url).read()
     soup = BeautifulSoup(page, "lxml")
 
     months = soup.find_all('td', {"class": "B6"})
@@ -61,7 +62,18 @@ def update_gas_prices(region_code):
     # Format date and price data into numpy arrays
     d_str = ['{} {}'.format(m, d.text.strip()[-2:])
              for m, d in zip(months_expanded, days)]
-    ngp_dates = [datetime.datetime.strptime(d, '%Y-%b %d') for d in d_str]
+    # Check for pattern matching
+    ngp_dates = []
+    del_inds = []
+    for i,d in enumerate(d_str):
+        if re.match('[0-9]{4}-[A-Z][a-z]{2} [0-9]{2}', d):
+            ngp_dates.append(datetime.datetime.strptime(d, '%Y-%b %d'))
+        else:
+            print(f"Datestring does not match expected format: {d}")
+            del_inds.append(i)
+
+    for i in del_inds[::-1]:
+        del values[i]
 
     v_str = [v.text.strip() for v in values]
     ngp_prices = [float(v) if v != u'' else 0. for v in v_str]
@@ -183,11 +195,11 @@ def plot_gas_mileage(dates, prices):
 
     print("Total amount I actually paid             : {:.2f}".format(amountActuallyPaid))
     print("Total amount I would have expected to pay: {:.2f}".format(amountExpectedPaid))
-    amountSaved = "${:.2f}".format(amountExpectedPaid - amountActuallyPaid)
+    amountSaved = amountExpectedPaid - amountActuallyPaid
     print("Average per fill-up: ${:.2f} ({} trips)".format((amountExpectedPaid - amountActuallyPaid)/mask2.sum(), mask2.sum()))
     cg = 'g' if amountSaved > 0 else 'r'
     ax2.text(my_dates[mask2][int(mask2.sum()*0.8)], 2.0, "Money saved: ", color='k', va='baseline', ha='right', size='large')
-    ax2.text(my_dates[mask2][int(mask2.sum()*0.8)], 2.0, amountSaved, color=cg, va='baseline', ha='left', size='large')
+    ax2.text(my_dates[mask2][int(mask2.sum()*0.8)], 2.0, f"${amountSaved:.2f}", color=cg, va='baseline', ha='left', size='large')
 
     # Fix final figure parameters
     fig.set_tight_layout(True)
@@ -207,18 +219,15 @@ def main(argv):
         for opt, arg in opts:
             if opt == '-u':
                 # Scrape the EIA website and get updated national avg gas prices
-                try:
-                    ngp_dates, ngp_prices = combine_gas_region_prices()
+                ngp_dates, ngp_prices = combine_gas_region_prices()
 
-                    # Save results to new file
+                # Save results to new file
 
-                    with open(cachedGasPriceFile, 'w') as wf:
-                        writer = csv.writer(wf, delimiter=',')
-                        ngp_dates_str = [datetime.datetime.strftime(d, ymdFormat) for d in ngp_dates]
-                        for d, p in zip(ngp_dates_str, ngp_prices):
-                            writer.writerow([d, p])
-                except:
-                    print("Exception when trying to download new gas prices.")
+                with open(cachedGasPriceFile, 'w') as wf:
+                    writer = csv.writer(wf, delimiter=',')
+                    ngp_dates_str = [datetime.datetime.strftime(d, ymdFormat) for d in ngp_dates]
+                    for d, p in zip(ngp_dates_str, ngp_prices):
+                        writer.writerow([d, p])
     else:
         # Use local copy of whatever data was scraped most recently
         ngp_dates, ngp_prices = load_gas_prices()
