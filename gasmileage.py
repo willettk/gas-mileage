@@ -37,7 +37,8 @@ def update_gas_prices(region_code):
     on the webpage.
     """
 
-    url = "http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EMM_EPM0U_PTE_R{}_DPG&f=W".format(region_code)
+    url = f"http://www.eia.gov/dnav/pet/hist/LeafHandler.ashx" + \
+        "?n=PET&s=EMM_EPM0U_PTE_R{region_code}_DPG&f=W"
     page = urllib2.urlopen(url).read()
     soup = BeautifulSoup(page, "lxml")
 
@@ -52,7 +53,7 @@ def update_gas_prices(region_code):
     # Remove empty cells for months without a fifth week of data
 
     for m, d, v in zip(months_expanded, days, values):
-        if d.text.strip() is u'':
+        if d.text.strip() == u'':
             months_expanded.remove(m)
             days.remove(d)
             values.remove(v)
@@ -63,7 +64,7 @@ def update_gas_prices(region_code):
     ngp_dates = [datetime.datetime.strptime(d, '%Y-%b %d') for d in d_str]
 
     v_str = [v.text.strip() for v in values]
-    ngp_prices = [float(v) if v is not u'' else 0. for v in v_str]
+    ngp_prices = [float(v) if v != u'' else 0. for v in v_str]
 
     return ngp_dates, ngp_prices
 
