@@ -30,6 +30,9 @@ def get_regions():
     return r
 
 
+import calendar
+abbr_to_num = {name: num for num, name in enumerate(calendar.month_abbr) if num}
+
 def update_gas_prices(region_code):
     """
     Raw source of data is EIA website
@@ -58,6 +61,13 @@ def update_gas_prices(region_code):
             months_expanded.remove(m)
             days.remove(d)
             values.remove(v)
+        # Assert that the month in the days string matches that in the years
+        try:
+            if int(d.text.strip().split('/')[0]) != abbr_to_num[m.split('-')[-1]]:
+                print(m,d,v)
+                break
+        except ValueError:
+            print(m,d,v)
 
     # Format date and price data into numpy arrays
     d_str = ['{} {}'.format(m, d.text.strip()[-2:])
