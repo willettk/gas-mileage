@@ -115,6 +115,7 @@ def load_gas_prices(filename=cachedGasPriceFile):
 
     with open(filename, 'r') as f:
         ngp = f.readlines()
+    ngp = sorted(ngp)
     ngp = [n.strip().split(',') for n in ngp]
     ngp_dates = [datetime.datetime.strptime(n[0], ymdFormat) for n in ngp]
     ngp_prices = [float(n[1]) for n in ngp]
