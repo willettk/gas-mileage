@@ -194,6 +194,30 @@ def plot_gas_mileage(dates, prices):
     labs = [l.get_label() for l in lns]
     ax2.legend(lns, labs, loc='best', fontsize='medium')
 
+    # Avg of fillups per month
+
+    """
+    t_rolling = 3
+    rolling_pad = [np.nan, ] * (t_rolling//2)
+
+    rolling = rolling_pad.copy()
+
+    d['YM'] = d['year'].astype(str) + '-' + d['month'].astype(str)
+    hist = d.groupby('YM').count()
+    for i in range(len(d) - t_rolling + 1):
+        first_ind = i
+        last_ind = first_ind + t_rolling + 1
+        rolling.append(np.mean(hist[first_ind:last_ind]))
+
+    rolling.extend(rolling_pad)
+    ax.plot_date(date, rolling,
+                 color='C0',
+                 fmt=",-",
+                 linewidth=3,
+                 drawstyle='steps-mid',
+                 )
+    """
+
     # How much money have I lost/saved compared to the regional average?
 
     amountActuallyPaid = (gallons[mask2] * price[mask2]).sum()
