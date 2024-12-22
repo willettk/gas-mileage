@@ -1,7 +1,7 @@
 import datetime
 import sys
 import getopt
-import urllib
+import urllib.request
 import itertools
 import csv
 import re
